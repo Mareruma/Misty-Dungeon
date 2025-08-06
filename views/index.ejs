@@ -3,35 +3,45 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Misty Dungeon Veikals</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    body { margin:0; padding:2em; font-family:'Cinzel',serif; background:#1c1c1c; color:#f8f8f2; }
-    h1 { text-align:center; color:#f0e68c; }
-    .product-list { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:2em; margin-top:2em; }
-    .product { background:#2b2b2b; padding:1.5em; border-radius:10px; text-align:center; border:2px solid #b8860b; }
-    .product h2 { color:#ffd700; }
-    .btn { background:#ffd700; border:none; padding:0.5em 1em; border-radius:5px; cursor:pointer; }
-    .btn:hover { background:#ffcc00; }
-    .cart-link { display:block; text-align:center; margin-top:20px; }
-  </style>
+  <title>Misty Dungeon</title>
 </head>
 <body>
   <h1>Misty Dungeon Veikals</h1>
-  <div class="product-list">
-    <% products.forEach(product => { %>
-      <div class="product">
-        <h2><%= product.name %></h2>
-        <p>Cena: <%= product.price %>€</p>
-        <p>Pieejams: <%= product.quantity %></p>
-        <form action="/cart/add" method="post">
-          <input type="hidden" name="id" value="<%= product._id %>">
-          <button class="btn" type="submit">Pievienot grozam</button>
+
+  <h2>Produkti</h2>
+  <div>
+    <% products.forEach(p => { %>
+      <div>
+        <h3><%= p.name %></h3>
+        <p>Cena: <%= p.price %>€</p>
+        <form action="/add-to-cart" method="post">
+          <input type="hidden" name="productId" value="<%= p._id %>">
+          <button type="submit">Pievienot grozam</button>
         </form>
       </div>
     <% }) %>
   </div>
 
-  <a class="cart-link" href="/cart">Skatīt grozu</a>
+  <hr>
+
+  <h2>Grozs</h2>
+  <% if (cart.length === 0) { %>
+    <p>Grozs ir tukšs</p>
+  <% } else { %>
+    <ul>
+      <% cart.forEach(c => { %>
+        <li>
+          <%= c.name %> - <%= c.price %>€
+          <form action="/remove-from-cart" method="post" style="display:inline;">
+            <input type="hidden" name="productId" value="<%= c.id %>">
+            <button type="submit">Noņemt</button>
+          </form>
+        </li>
+      <% }) %>
+    </ul>
+    <form action="/pay" method="post">
+      <button type="submit">Pirkt visu grozu</button>
+    </form>
+  <% } %>
 </body>
 </html>
