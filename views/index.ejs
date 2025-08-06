@@ -1,0 +1,112 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Misty Dungeon</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    
+    body {
+      margin: 0;
+      padding: 2em;
+      font-family: 'Cinzel', serif;
+      background: url('/images/dungeon-bg.jpg') no-repeat center center fixed;
+      background-size: cover;
+      color: #f8f8f2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      backdrop-filter: brightness(0.5);
+    }
+
+    h1 {
+      font-size: 3rem;
+      color: #f0e68c;
+      text-shadow: 2px 2px 5px #000;
+      margin-bottom: 1em;
+    }
+
+    .product-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2em;
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .product {
+      background: rgba(0, 0, 0, 0.75);
+      padding: 1.5em;
+      border: 2px solid #b8860b;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 0 15px #000;
+    }
+
+    .product h2 {
+      font-size: 1.4rem;
+      color: #ffd700;
+      margin-bottom: 0.5em;
+    }
+
+    .product p {
+      font-size: 1.1rem;
+      margin-bottom: 0.3em;
+    }
+
+    .product .quantity {
+      font-weight: bold;
+      margin-bottom: 1em;
+      color: #ff6347;
+    }
+
+    .product form input[type="submit"] {
+      font-size: 1rem;
+      background-color: #ffd700;
+      border: none;
+      padding: 0.6em 1.2em;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Cinzel', serif;
+      color: #000;
+      transition: background-color 0.3s ease;
+    }
+
+    .product form input[type="submit"]:hover {
+      background-color: #ffcc00;
+    }
+
+    .product form input[type="submit"]:disabled {
+      background-color: #888;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>Misty Dungeon Veikals</h1>
+
+  <div class="product-list">
+    <% products.forEach(product => { %>
+      <div class="product">
+        <h2><%= product.name %></h2>
+        <p><%= product.description %></p>
+        <p class="quantity">Pieejamais daudzums: <%= product.quantity %></p>
+        <p>Cena: <%= product.price %>€</p>
+
+        <form action="/cart/add/<%= product.slug %>" method="post" style="display:inline;">
+          <button type="submit" <%= product.quantity <= 0 ? 'disabled' : '' %>>Pievienot grozam</button>
+        </form>
+
+        <form action="/pay/<%= product.slug %>" method="post" style="display:inline;">
+          <button type="submit" <%= product.quantity <= 0 ? 'disabled' : '' %>>Pirkt uzreiz</button>
+        </form>
+      </div>
+    <% }) %>
+  </div>
+
+  <hr>
+  <a href="/cart" style="color:#ffd700; font-weight:bold;">Skatīt grozu</a>
+</body>
+</html>
