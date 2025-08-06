@@ -9,11 +9,12 @@ const Product = require('./models/product');
 
 const app = express();
 
+// Konfigurē EJS skatu dzinēju un publisko mapi
 app.set('view engine', 'ejs');
-app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Sesijas grozam
+// Sesijas iestatījumi
 app.use(
     session({
         secret: 'misty_dungeon_secret',
@@ -22,7 +23,7 @@ app.use(
     })
 );
 
-// MongoDB savienojums
+// Savienojums ar MongoDB
 mongoose
     .connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB savienots'))
@@ -34,28 +35,36 @@ app.get('/', async (req, res) => {
     res.render('index', { products, cart: req.session.cart || [] });
 });
 
-// Pievieno produktus grozam
+// Pievienot produktu grozam
 app.post('/add-to-cart', async (req, res) => {
-    const product = await Product.findById(req.body.productId);
-    if (!req.session.cart) req.session.cart = [];
-    req.session.cart.push({
-        id: product._id,
-        name: product.name,
-        price: product.price
-    });
-    res.redirect('/');
+    try {
+        const product = await Product.findById(req.body.productId);
+        if (!product) return res.send('Produkts nav atrasts');
+        if (!req.session.cart) req.session.cart = [];
+
+        req.session.cart.push({
+            id: product._id.toString(),
+            name: product.name,
+            price: product.price
+        });
+
+        res.redirect('/');
+    } catch (error) {
+        console.error(error);
+        res.send('Kļūda pievienojot grozam');
+    }
 });
 
-// Noņem no groza
+// Noņemt produktu no groza
 app.post('/remove-from-cart', (req, res) => {
-    const id = req.body.productId;
+    const idToRemove = req.body.productId;
     if (req.session.cart) {
-        req.session.cart = req.session.cart.filter((item) => item.id !== id);
+        req.session.cart = req.session.cart.filter(item => item.id !== idToRemove);
     }
     res.redirect('/');
 });
 
-// Maksājums ar PayPal
+// Maksājuma uzsākšana ar PayPal
 app.post('/pay', async (req, res) => {
     try {
         const cart = req.session.cart || [];
@@ -72,7 +81,7 @@ app.post('/pay', async (req, res) => {
 app.get('/complete-order', async (req, res) => {
     try {
         await paypal.capturePayment(req.query.token);
-        req.session.cart = []; // Iztukšo grozu
+        req.session.cart = []; // Notīra grozu pēc maksājuma
         res.send('Pasūtījums veiksmīgi apmaksāts!');
     } catch (error) {
         console.error(error);
@@ -80,8 +89,10 @@ app.get('/complete-order', async (req, res) => {
     }
 });
 
+// Atcelts pasūtījums
 app.get('/cancel-order', (req, res) => {
     res.redirect('/');
 });
 
+// Startē serveri
 app.listen(3000, () => console.log('Serveris palaists uz 3000 porta'));
