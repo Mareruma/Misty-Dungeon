@@ -1,131 +1,109 @@
-require('dotenv').config()
-const express = require('express')
-const bodyParser = require('body-parser')
-const path = require('path')
-const paypal = require('./services/paypal')
-require('./services/mongo')
-const Product = require('./models/Product')
-const session = require('express-session')
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const session = require('express-session');
+const bodyParser = require('body-parser');
+const path = require('path');
+const Product = require('./models/product');
+const paypal = require('./services/paypal');
 
-const app = express()
+const app = express();
 
-app.set('view engine', 'ejs')
-app.use(bodyParser.urlencoded({ extended: true }))
-app.use(express.static(path.join(__dirname, 'public')))
-app.use(session({
-  secret: 'tavsSuperSlepenaisVards',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { maxAge: 3600000 } // 1h sesijas laiks
-}))
+// EJS un Middleware
+app.set('view engine', 'ejs');
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(
+  session({
+    secret: 'misty-dungeon-secret',
+    resave: false,
+    saveUninitialized: true,
+  })
+);
 
-// Mājaslapa - produkti
+// MongoDB savienojums
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => console.log('MongoDB savienots'))
+  .catch((err) => console.error('MongoDB kļūda:', err));
+
+// ----- ROUTES -----
+
+// Galvenā lapa ar produktu sarakstu
 app.get('/', async (req, res) => {
-  const products = await Product.find()
-  res.render('index', { products })
-})
-
-// Pievieno produktu grozam
-app.post('/cart/add/:slug', async (req, res) => {
-  const slug = req.params.slug
-  const product = await Product.findOne({ slug })
-  if (!product) return res.send('Produkts nav atrasts')
-
-  if (!req.session.cart) req.session.cart = {}
-
-  if (!req.session.cart[slug]) {
-    req.session.cart[slug] = { 
-      name: product.name,
-      price: product.price,
-      quantity: 0,
-      slug: product.slug
-    }
-  }
-
-  req.session.cart[slug].quantity += 1
-  res.redirect('/cart')
-})
-
-// Groza lapas rādīšana
-app.get('/cart', async (req, res) => {
-  const cart = req.session.cart || {}
-  res.render('cart', { cart })
-})
-
-// Maksāšanas process ar visu grozu
-app.post('/pay/cart', async (req, res) => {
   try {
-    const cart = req.session.cart
-    if (!cart || Object.keys(cart).length === 0) {
-      return res.send('Grozs ir tukšs')
-    }
-
-    // Pārbauda vai visiem produktiem ir pietiekami daudz daudzuma DB
-    for (const slug of Object.keys(cart)) {
-      const product = await Product.findOne({ slug })
-      if (!product) return res.send(`Produkts ${slug} nav atrasts`)
-      if (product.quantity < cart[slug].quantity) {
-        return res.send(`Nav pietiekami daudzums produktam: ${product.name}`)
-      }
-    }
-
-    // Izveido PayPal pasūtījumu ar visiem groza produktiem
-    const items = Object.values(cart).map(item => ({
-      name: item.name,
-      description: item.name,
-      quantity: item.quantity,
-      unit_amount: {
-        currency_code: 'EUR',
-        value: item.price
-      }
-    }))
-
-    // Aprēķina kopējo summu
-    const total = Object.values(cart).reduce((sum, item) => sum + item.quantity * parseFloat(item.price), 0).toFixed(2)
-
-    // Izveido pasūtījumu PayPal API tieši šeit
-    const url = await paypal.createOrderWithItems(items, total)
-
-    // Saglabā groza saturu sesijā, lai pēc apmaksas samazinātu daudzumus
-    req.session.cartForOrder = cart
-
-    res.redirect(url)
-  } catch (error) {
-    console.error(error)
-    res.send('Kļūda: ' + error.message)
+    const products = await Product.find();
+    res.render('index', { products });
+  } catch (err) {
+    res.send('Kļūda: ' + err.message);
   }
-})
+});
 
-// Pēc maksājuma - apstiprinājums un daudzumu atjaunošana
+// Pievienot produktu grozam
+app.post('/cart/add', async (req, res) => {
+  const { id } = req.body;
+  const product = await Product.findById(id);
+
+  if (!req.session.cart) req.session.cart = [];
+  req.session.cart.push({
+    _id: product._id,
+    name: product.name,
+    price: product.price,
+  });
+
+  res.redirect('/cart');
+});
+
+// Groza skats
+app.get('/cart', (req, res) => {
+  const cart = req.session.cart || [];
+  const total = cart.reduce((sum, p) => sum + p.price, 0);
+  res.render('cart', { cart, total });
+});
+
+// Noņemt produktu no groza
+app.post('/cart/remove', (req, res) => {
+  const { id } = req.body;
+  if (!req.session.cart) req.session.cart = [];
+  req.session.cart = req.session.cart.filter((item) => item._id.toString() !== id);
+  res.redirect('/cart');
+});
+
+// Pirkuma apmaksa
+app.post('/pay', async (req, res) => {
+  try {
+    const cart = req.session.cart || [];
+    if (cart.length === 0) return res.send('Grozs ir tukšs!');
+
+    const url = await paypal.createOrder(cart);
+    res.redirect(url);
+  } catch (error) {
+    console.error(error);
+    res.send('Kļūda: ' + error.message);
+  }
+});
+
+// PayPal pirkuma pabeigšana
 app.get('/complete-order', async (req, res) => {
   try {
-    await paypal.capturePayment(req.query.token)
+    await paypal.capturePayment(req.query.token);
 
-    // Samazina daudzumus pēc veiksmīgas apmaksas
-    const cart = req.session.cartForOrder || {}
-
-    for (const slug of Object.keys(cart)) {
-      const product = await Product.findOne({ slug })
-      if (product) {
-        product.quantity -= cart[slug].quantity
-        if (product.quantity < 0) product.quantity = 0
-        await product.save()
-      }
+    // Samazinām pieejamo daudzumu par 1 katram produktam
+    const cart = req.session.cart || [];
+    for (const item of cart) {
+      await Product.findByIdAndUpdate(item._id, { $inc: { quantity: -1 } });
     }
 
-    // Iztukšo sesijas grozu
-    req.session.cart = {}
-    req.session.cartForOrder = {}
-
-    res.send('Pasūtījums veiksmīgi apmaksāts!')
+    req.session.cart = [];
+    res.send('Pasūtījums veiksmīgi apmaksāts!');
   } catch (error) {
-    console.error(error)
-    res.send('Kļūda: ' + error.message)
+    console.error(error);
+    res.send('Kļūda: ' + error.message);
   }
-})
+});
 
 app.get('/cancel-order', (req, res) => {
-  res.redirect('/')
-})
+  res.redirect('/cart');
+});
 
-app.listen(3000, () => console.log('Serveris palaists uz 3000 porta'))
+app.listen(3000, () => console.log('Serveris palaists uz 3000 porta'));
