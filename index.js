@@ -1,20 +1,20 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
-const mongoose = require('mongoose');
 const path = require('path');
 const bodyParser = require('body-parser');
 const paypal = require('./services/paypal');
 const Product = require('./models/product');
 
+// Importē mongo savienojumu (tam jau jāizveido savienojums)
+require('./services/mongo');
+
 const app = express();
 
-// Konfigurē EJS skatu dzinēju un publisko mapi
 app.set('view engine', 'ejs');
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Sesijas iestatījumi
 app.use(
     session({
         secret: 'misty_dungeon_secret',
@@ -22,12 +22,6 @@ app.use(
         saveUninitialized: true
     })
 );
-
-// Savienojums ar MongoDB
-mongoose
-    .connect(process.env.MONGO_URI)
-    .then(() => console.log('MongoDB savienots'))
-    .catch((err) => console.error('MongoDB kļūda:', err));
 
 // Galvenā lapa
 app.get('/', async (req, res) => {
@@ -94,5 +88,5 @@ app.get('/cancel-order', (req, res) => {
     res.redirect('/');
 });
 
-// Startē serveri
-app.listen(3000, () => console.log('Serveris palaists uz 3000 porta'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Serveris palaists uz ${PORT} porta`));
