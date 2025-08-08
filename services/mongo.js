@@ -1,5 +1,13 @@
-const mongoose = require('mongoose')
+require('dotenv').config();
+const mongoose = require('mongoose');
 
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('MongoDB Atlas savienojums izveidots'))
-  .catch(err => console.error('MongoDB kļūda:', err))
+const uri = process.env.MONGODB_URI;
+
+mongoose.connect(uri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('MongoDB Atlas savienojums izveidots'))
+.catch(err => console.error('MongoDB kļūda:', err));
+
+module.exports = mongoose;
